@@ -3,7 +3,7 @@
 use frame_support::{impl_outer_event, impl_outer_origin, parameter_types};
 use frame_support::traits::{OnFinalize};
 use frame_system::{EnsureOneOf, EnsureRoot, EnsureSigned, RawOrigin};
-use sp_core::{H256, U256};
+use sp_core::{H256, U256, Blake2Hasher};
 use pallet_evm::{
     Account as EVMAccount, EnsureAddressRoot, EnsureAddressNever, EnsureAddressTruncated, FeeCalculator,
     HashedAddressMapping,
@@ -12,9 +12,11 @@ use sp_runtime::{
     testing::Header,
     traits::{BlakeTwo256, IdentityLookup},
     Perbill,
+    AccountId32,
 };
 use crate::{GenesisConfig, Module, Trait};
 use std::marker::PhantomData;
+use std::collections::BTreeMap;
 use sp_io;
 
 mod event_mod {
@@ -56,7 +58,8 @@ impl frame_system::Trait for Runtime {
     type BlockNumber = u64;
     type Hash = H256;
     type Hashing = BlakeTwo256;
-    type AccountId = u64;
+    //type AccountId = u64;
+    type AccountId = AccountId32;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Header = Header;
     type Event = TestEvent;
@@ -81,7 +84,11 @@ impl Trait for Runtime {
     type Event = TestEvent;
     type MembershipId = u64;
 
-    type AddressMapping = HashedAddressMapping<Blake2Hasher>;
+    type Currency = pallet_balances::Module::<Self>;
+
+    type AddressMapping = HashedAddressMapping<BlakeTwo256>;
+
+    type Evm = Self;
 }
 
 impl pallet_timestamp::Trait for Runtime {
@@ -163,6 +170,7 @@ pub enum OriginType<AccountId> {
 pub fn default_genesis_config() -> GenesisConfig<Runtime> {
     GenesisConfig::<Runtime> {
         my_storage_value: 0,
+        accounts: BTreeMap::new(),
     }
 }
 

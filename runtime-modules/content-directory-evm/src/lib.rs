@@ -9,11 +9,15 @@ use codec::{Codec, Decode, Encode};
 use frame_support::{
     decl_error, decl_event, decl_module, decl_storage, ensure, error::BadOrigin, Parameter,
 };
+use frame_support::traits::Currency;
+use frame_system::ensure_signed;
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 use sp_arithmetic::traits::BaseArithmetic;
-use sp_runtime::traits::{Hash, MaybeSerialize, Member, SaturatedConversion, Saturating};
+use sp_runtime::traits::{Hash, MaybeSerialize, Member, SaturatedConversion, Saturating, UniqueSaturatedInto};
 use sp_core::{U256, H256, H160, Hasher};
+use pallet_evm::AddressMapping;
+
 
 mod mock;
 mod tests;
@@ -37,7 +41,7 @@ pub struct GenesisAccount {
 /////////////////// Trait, Storage, Errors, and Events /////////////////////////
 
 /// The main content directory evm trait.
-pub trait Trait: frame_system::Trait + pallet_evm::Trait {
+pub trait Trait: frame_system::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
 
@@ -53,7 +57,11 @@ pub trait Trait: frame_system::Trait + pallet_evm::Trait {
         + From<u64>
         + Into<u64>;
 
-    type AddressMapping;
+    type AddressMapping: AddressMapping<Self::AccountId>;
+
+    type Currency: Currency<Self::AccountId>;
+
+    type Evm: pallet_evm::Trait;
 }
 
 
@@ -79,7 +87,7 @@ decl_storage! {
                     frame_system::Module::<T>::inc_account_nonce(&account_id);
                 }
 
-                T::Currency::deposit_creating(
+                <T as Trait>::Currency::deposit_creating(
                     &account_id,
                     account.balance.low_u128().unique_saturated_into(),
                 );
@@ -111,6 +119,14 @@ decl_error! {
     pub enum Error for Module<T: Trait> {
         /// Dummy error
         MyDummyError,
+
+        BadOrigin,
+    }
+}
+
+impl<T: Trait> From<BadOrigin> for Error<T> {
+    fn from(_error: BadOrigin) -> Self {
+        Error::<T>::BadOrigin
     }
 }
 
@@ -141,6 +157,21 @@ decl_module! {
                 apply_state: bool
             );
             */
+            let account_id = ensure_signed(origin)?;
+
+            let address_from = T::AddressMapping::into_account_id(account_id.into());
+
+            let result = pallet_evm::Module::<T::Evm>::execute_call(
+                H160::zero(),
+                H160::zero(),
+                vec![],
+                10000.into(),
+                4000000,
+                1.into(),
+                Some(1.into()),
+                true,
+            );
+            println!("{:?}", result);
 
             // emit event
             Self::deposit_event(RawEvent::MyDummyEvent2());
