@@ -16,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use sp_arithmetic::traits::BaseArithmetic;
 use sp_runtime::traits::{Hash, MaybeSerialize, Member, SaturatedConversion, Saturating, UniqueSaturatedInto};
 use sp_core::{U256, H256, H160, Hasher};
-use pallet_evm::AddressMapping;
+use pallet_evm::{AddressMapping, EnsureAddressSame, EnsureAddressOrigin};
 
 
 mod mock;
@@ -57,13 +57,19 @@ pub trait Trait: frame_system::Trait {
         + From<u64>
         + Into<u64>;
 
-    type AddressMapping: AddressMapping<Self::AccountId>;
+    type AccountAddressMapping: AccountAddressMapping<Self::AccountId, H160>;
 
     type Currency: Currency<Self::AccountId>;
 
     type Evm: pallet_evm::Trait;
 }
 
+pub trait AccountAddressMapping<AccountId, Address> {
+    // TODO: this function might need a rework as it is not sure if accounts and addresses have 1:1 relation
+    fn into_account_id(address: &Address) -> AccountId;
+
+    fn into_address(account_id: &AccountId) -> Address;
+}
 
 decl_storage! {
     trait Store for Module<T: Trait> as ContentDirectoryEvm {
@@ -79,7 +85,7 @@ decl_storage! {
         config(accounts): std::collections::BTreeMap<H160, GenesisAccount>;
         build(|config: &GenesisConfig::<T>| {
             for (address, account) in &config.accounts {
-                let account_id = <T as Trait>::AddressMapping::into_account_id(*address);
+                let account_id = <T as Trait>::AccountAddressMapping::into_account_id(address);
 
                 // ASSUME: in one single EVM transaction, the nonce will not increase more than
                 // `u128::max_value()`.
@@ -140,7 +146,7 @@ decl_module! {
         /// Setup events
         fn deposit_event() = default;
 
-        /// Testing extrinsic
+        /// Testing extrinsic - test each evm feature piece by piece before creating more sophisticated tests
         #[weight = 10_000_000]
         pub fn test_call(
             origin,
@@ -159,10 +165,20 @@ decl_module! {
             */
             let account_id = ensure_signed(origin)?;
 
-            let address_from = T::AddressMapping::into_account_id(account_id.into());
+            //let _tmp = <EnsureAddressSame as EnsureAddressOrigin<T::Origin>>::try_address_origin(H160::zero(), origin);
+
+            //let address_from = T::AddressMapping::into_account_id(account_id.into());
+            let address_from = T::AccountAddressMapping::into_address(&account_id);
+
+            // topup account
+            <T as Trait>::Currency::deposit_creating(
+                &account_id,
+                10000000.into(),
+            );
 
             let result = pallet_evm::Module::<T::Evm>::execute_call(
-                H160::zero(),
+                //H160::zero(),
+                address_from,
                 H160::zero(),
                 vec![],
                 10000.into(),
@@ -198,7 +214,7 @@ impl<T: Trait> EvmWrapper<T> {
         nonce: Option<U256>,
         apply_state: bool
     ) {
-        
+
         source
         target
         input

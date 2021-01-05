@@ -10,7 +10,7 @@ fn evm_first_test() {
     let config = default_genesis_config();
 
     build_test_externalities(config).execute_with(|| {
-        let origin = OriginType::Root;
+        let origin = OriginType::Signed(REGULAR_ACCOUNT_1);
 
         Mocks::test_call(origin);
         // todo

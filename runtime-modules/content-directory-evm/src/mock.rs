@@ -3,10 +3,10 @@
 use frame_support::{impl_outer_event, impl_outer_origin, parameter_types};
 use frame_support::traits::{OnFinalize};
 use frame_system::{EnsureOneOf, EnsureRoot, EnsureSigned, RawOrigin};
-use sp_core::{H256, U256, Blake2Hasher};
+use sp_core::{H256, H160, U256, Blake2Hasher, Hasher};
 use pallet_evm::{
     Account as EVMAccount, EnsureAddressRoot, EnsureAddressNever, EnsureAddressTruncated, FeeCalculator,
-    HashedAddressMapping,
+    HashedAddressMapping, AddressMapping
 };
 use sp_runtime::{
     testing::Header,
@@ -14,7 +14,7 @@ use sp_runtime::{
     Perbill,
     AccountId32,
 };
-use crate::{GenesisConfig, Module, Trait};
+use crate::{GenesisConfig, Module, Trait, AccountAddressMapping};
 use std::marker::PhantomData;
 use std::collections::BTreeMap;
 use sp_io;
@@ -35,6 +35,8 @@ impl_outer_event! {
         pallet_evm<T>,
     }
 }
+
+pub const REGULAR_ACCOUNT_1: u64 = 1;
 
 
 // Workaround for https://github.com/rust-lang/rust/issues/26925 . Remove when sorted.
@@ -58,8 +60,8 @@ impl frame_system::Trait for Runtime {
     type BlockNumber = u64;
     type Hash = H256;
     type Hashing = BlakeTwo256;
-    //type AccountId = u64;
-    type AccountId = AccountId32;
+    type AccountId = u64;
+    //type AccountId = AccountId32;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Header = Header;
     type Event = TestEvent;
@@ -86,7 +88,8 @@ impl Trait for Runtime {
 
     type Currency = pallet_balances::Module::<Self>;
 
-    type AddressMapping = HashedAddressMapping<BlakeTwo256>;
+    //type AddressMapping = HashedAddressMapping<BlakeTwo256>;
+    type AccountAddressMapping = AccountAddressConverter<Self::AccountId, H160, Blake2Hasher>;
 
     type Evm = Self;
 }
@@ -108,6 +111,63 @@ impl pallet_balances::Trait for Runtime {
     type WeightInfo = ();
     type MaxLocks = ();
 }
+
+pub struct AccountAddressConverter<AccountId, Address, H: Hasher<Out=H256>> {
+    _dummy: PhantomData<(AccountId, Address, H)>, // 0-sized data meant only to bound generic parameters
+}
+
+// TODO: ensure that all possible AccountIds are convertable or create some meaningful restrictions
+//       there will be a problem if AccountId is 64-bit unsigned int while Ethereum private keys are 32-bit unsinged ints
+impl<AccountId: From<u64>, Address: From<H160>, H: Hasher<Out=H256>> AccountAddressMapping<AccountId, Address> for AccountAddressConverter<AccountId, Address, H> {
+    fn into_account_id(address: &Address) -> AccountId {
+        /*
+        let mut data = [0u8; 24];
+        data[0..4].copy_from_slice(b"evm:");
+        data[4..24].copy_from_slice(&address[..]);
+        let hash = H::hash(&data);
+
+        // TODO: create tests for AccountId/address conversions and test edge cases (ensure no overlaps, etc.)
+        //AccountId32::from(Into::<[u8; 32]>::into(hash))
+        //AccountId::from(Into::<[u8; 32]>::into(hash))
+        //AccountId::from(Into::<[u8; 32]>::into(hash))
+
+        AccountId::from()
+        */
+        1.into()
+    }
+
+    fn into_address(account_id: &AccountId) -> Address {
+        H160::zero().into()
+        //AddressMapping::into_account_id(account_id.into())
+    }
+}
+
+impl<AccountId: From<u64>, Address: From<H160>, H: Hasher<Out=H256>> AddressMapping<u64> for AccountAddressConverter<AccountId, Address, H> {
+    fn into_account_id(address: H160) -> u64 {
+        let mut data = [0u8; 24];
+        data[0..4].copy_from_slice(b"evm:");
+        data[4..24].copy_from_slice(&address[..]);
+        let hash = H::hash(&data);
+
+        //u64::from(Into::<[u8; 32]>::into(hash))
+        //u64::from(Into::<[u8; 32]>::into(hash))
+        //u64::from(hash.into())
+        //hash.into()
+        //let aa: u32 = Into::<[u8; 32]>::into(hash).into();
+
+
+
+        1
+    }
+}
+
+/*
+impl From<[u8; 32]> for u64 {
+    fn from(from: [u8; 32]) -> u64 {
+        from.into().into()
+    }
+}
+*/
 
 //static ISTANBUL_CONFIG: Config = Config::istanbul();
 
@@ -142,9 +202,18 @@ impl pallet_evm::Trait for Runtime {
 // This trait needs newer version of evm pallet (thus upgrade to whole branch is required)
 impl pallet_evm::Trait for Runtime {
     type FeeCalculator = FixedGasPrice;
+
+    /*
     type CallOrigin = EnsureAddressRoot<Self::AccountId>;
     type WithdrawOrigin = EnsureAddressNever<Self::AccountId>;
-    type AddressMapping = HashedAddressMapping<BlakeTwo256>;
+    */
+    type CallOrigin = EnsureAddressRoot<Self::AccountId>;
+    type WithdrawOrigin = EnsureAddressNever<Self::AccountId>;
+
+    //type AddressMapping = HashedAddressMapping<BlakeTwo256>;
+    //type AddressMapping = HashedAddressMapping<Blake2Hasher>;
+    //type AddressMapping = MyHashedAddressMapping<BlakeTwo256>;
+    type AddressMapping = AccountAddressConverter<Self::AccountId, H160, Blake2Hasher>;
     type Currency = pallet_balances::Module<Runtime>;
 
     // TODO: make events work
@@ -154,6 +223,32 @@ impl pallet_evm::Trait for Runtime {
     type ChainId = ChainId;
     //fn config() -> &'static Config {  }
 }
+
+/*
+/// Hashed address mapping.
+pub struct MyHashedAddressMapping<H>(PhantomData<H>);
+
+impl<H: Hasher<Out=H256>> AddressMapping<u64> for MyHashedAddressMapping<H> {
+    fn into_account_id(address: H160) -> u64 {
+        let mut data = [0u8; 24];
+        data[0..4].copy_from_slice(b"evm:");
+        data[4..24].copy_from_slice(&address[..]);
+        let hash = H::hash(&data);
+
+        //u64::from(Into::<[u8; 32]>::into(hash))
+        //u64::from(Into::<[u8; 32]>::into(hash))
+        //u64::from(hash.into())
+        //hash.into()
+        //let aa: u32 = Into::<[u8; 32]>::into(hash).into();
+
+
+
+        1
+    }
+}
+*/
+
+
 
 /////////////////// Data structures ////////////////////////////////////////////
 
