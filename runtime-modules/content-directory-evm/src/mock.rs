@@ -1,23 +1,22 @@
 #![cfg(test)]
 
+use crate::{AccountAddressMapping, GenesisConfig, Module, Trait};
+use frame_support::traits::OnFinalize;
 use frame_support::{impl_outer_event, impl_outer_origin, parameter_types};
-use frame_support::traits::{OnFinalize};
 use frame_system::{EnsureOneOf, EnsureRoot, EnsureSigned, RawOrigin};
-use sp_core::{H256, H160, U256, Blake2Hasher, Hasher};
 use pallet_evm::{
-    Account as EVMAccount, EnsureAddressRoot, EnsureAddressNever, EnsureAddressTruncated, FeeCalculator,
-    HashedAddressMapping, AddressMapping
+    Account as EVMAccount, AddressMapping, EnsureAddressNever, EnsureAddressRoot,
+    EnsureAddressTruncated, FeeCalculator, HashedAddressMapping,
 };
+use sp_core::{Blake2Hasher, Hasher, H160, H256, U256};
+use sp_io;
 use sp_runtime::{
     testing::Header,
     traits::{BlakeTwo256, IdentityLookup},
-    Perbill,
-    AccountId32,
+    AccountId32, Perbill,
 };
-use crate::{GenesisConfig, Module, Trait, AccountAddressMapping};
-use std::marker::PhantomData;
 use std::collections::BTreeMap;
-use sp_io;
+use std::marker::PhantomData;
 
 mod event_mod {
     pub use crate::Event;
@@ -36,8 +35,9 @@ impl_outer_event! {
     }
 }
 
-pub const REGULAR_ACCOUNT_1: u64 = 1;
-
+//pub const REGULAR_ACCOUNT_1: u64 = 1;
+pub const REGULAR_ACCOUNT_1: [u8; 32] = [1u8; 32];
+pub const REGULAR_ACCOUNT_2: [u8; 32] = [2u8; 32];
 
 // Workaround for https://github.com/rust-lang/rust/issues/26925 . Remove when sorted.
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -60,8 +60,8 @@ impl frame_system::Trait for Runtime {
     type BlockNumber = u64;
     type Hash = H256;
     type Hashing = BlakeTwo256;
-    type AccountId = u64;
-    //type AccountId = AccountId32;
+    //type AccountId = u64;
+    type AccountId = AccountId32;
     type Lookup = IdentityLookup<Self::AccountId>;
     type Header = Header;
     type Event = TestEvent;
@@ -86,7 +86,7 @@ impl Trait for Runtime {
     type Event = TestEvent;
     type MembershipId = u64;
 
-    type Currency = pallet_balances::Module::<Self>;
+    type Currency = pallet_balances::Module<Self>;
 
     //type AddressMapping = HashedAddressMapping<BlakeTwo256>;
     type AccountAddressMapping = AccountAddressConverter<Self::AccountId, H160, Blake2Hasher>;
@@ -112,62 +112,66 @@ impl pallet_balances::Trait for Runtime {
     type MaxLocks = ();
 }
 
-pub struct AccountAddressConverter<AccountId, Address, H: Hasher<Out=H256>> {
+pub struct AccountAddressConverter<AccountId, Address, H: Hasher<Out = H256>> {
     _dummy: PhantomData<(AccountId, Address, H)>, // 0-sized data meant only to bound generic parameters
 }
 
 // TODO: ensure that all possible AccountIds are convertable or create some meaningful restrictions
 //       there will be a problem if AccountId is 64-bit unsigned int while Ethereum private keys are 32-bit unsinged ints
-impl<AccountId: From<u64>, Address: From<H160>, H: Hasher<Out=H256>> AccountAddressMapping<AccountId, Address> for AccountAddressConverter<AccountId, Address, H> {
+impl<
+        AccountId: From<AccountId32> + Into<AccountId32> + Clone,
+        Address: From<H160> + Into<H160> + Clone,
+        H: Hasher<Out = H256>,
+    > AccountAddressMapping<AccountId, Address> for AccountAddressConverter<AccountId, Address, H>
+{
     fn into_account_id(address: &Address) -> AccountId {
-        /*
-        let mut data = [0u8; 24];
-        data[0..4].copy_from_slice(b"evm:");
-        data[4..24].copy_from_slice(&address[..]);
-        let hash = H::hash(&data);
+        let address_h160: H160 = address.clone().into();
+        let address_bytes: [u8; 20] = address_h160.to_fixed_bytes();
 
-        // TODO: create tests for AccountId/address conversions and test edge cases (ensure no overlaps, etc.)
-        //AccountId32::from(Into::<[u8; 32]>::into(hash))
-        //AccountId::from(Into::<[u8; 32]>::into(hash))
-        //AccountId::from(Into::<[u8; 32]>::into(hash))
+        let mut address_bytes_32: [u8; 32] = [0u8; 32];
+        address_bytes_32[0..20].copy_from_slice(&address_bytes[..]);
 
-        AccountId::from()
-        */
-        1.into()
+        //let tmp = AccountId32::from(Into::<[u8; 32]>::into(address_bytes.into()));
+        let tmp = AccountId32::from(address_bytes_32);
+
+        Self::account32_to_account(&tmp)
     }
 
     fn into_address(account_id: &AccountId) -> Address {
-        H160::zero().into()
-        //AddressMapping::into_account_id(account_id.into())
+        // TODO: forbid interaction of accounts identified with higher number than 20 bytes (?)
+
+        let account_id32 = Self::account_to_account32(account_id);
+
+        let mut account_bytes_32: [u8; 32] = *AsRef::<[u8; 32]>::as_ref(&account_id32);
+
+        let mut address_bytes_20: [u8; 20] = [0u8; 20];
+        address_bytes_20[0..20].copy_from_slice(&account_bytes_32[0..20]);
+
+        H160::from(address_bytes_20).into()
+    }
+
+    fn account_to_account32(account_id: &AccountId) -> AccountId32 {
+        account_id.clone().into()
+    }
+
+    fn account32_to_account(account_id: &AccountId32) -> AccountId {
+        account_id.clone().into()
     }
 }
 
-impl<AccountId: From<u64>, Address: From<H160>, H: Hasher<Out=H256>> AddressMapping<u64> for AccountAddressConverter<AccountId, Address, H> {
-    fn into_account_id(address: H160) -> u64 {
-        let mut data = [0u8; 24];
-        data[0..4].copy_from_slice(b"evm:");
-        data[4..24].copy_from_slice(&address[..]);
-        let hash = H::hash(&data);
+impl<
+        AccountId: From<AccountId32> + Into<AccountId32> + Clone,
+        Address: From<H160> + Into<H160> + Clone,
+        H: Hasher<Out = H256>,
+    > AddressMapping<AccountId32> for AccountAddressConverter<AccountId, Address, H>
+{
+    fn into_account_id(address: H160) -> AccountId32 {
+        let account_id =
+            <Self as AccountAddressMapping<AccountId, Address>>::into_account_id(&address.into());
 
-        //u64::from(Into::<[u8; 32]>::into(hash))
-        //u64::from(Into::<[u8; 32]>::into(hash))
-        //u64::from(hash.into())
-        //hash.into()
-        //let aa: u32 = Into::<[u8; 32]>::into(hash).into();
-
-
-
-        1
+        <Self as AccountAddressMapping<AccountId, Address>>::account_to_account32(&account_id)
     }
 }
-
-/*
-impl From<[u8; 32]> for u64 {
-    fn from(from: [u8; 32]) -> u64 {
-        from.into().into()
-    }
-}
-*/
 
 //static ISTANBUL_CONFIG: Config = Config::istanbul();
 
@@ -224,32 +228,6 @@ impl pallet_evm::Trait for Runtime {
     //fn config() -> &'static Config {  }
 }
 
-/*
-/// Hashed address mapping.
-pub struct MyHashedAddressMapping<H>(PhantomData<H>);
-
-impl<H: Hasher<Out=H256>> AddressMapping<u64> for MyHashedAddressMapping<H> {
-    fn into_account_id(address: H160) -> u64 {
-        let mut data = [0u8; 24];
-        data[0..4].copy_from_slice(b"evm:");
-        data[4..24].copy_from_slice(&address[..]);
-        let hash = H::hash(&data);
-
-        //u64::from(Into::<[u8; 32]>::into(hash))
-        //u64::from(Into::<[u8; 32]>::into(hash))
-        //u64::from(hash.into())
-        //hash.into()
-        //let aa: u32 = Into::<[u8; 32]>::into(hash).into();
-
-
-
-        1
-    }
-}
-*/
-
-
-
 /////////////////// Data structures ////////////////////////////////////////////
 
 #[allow(dead_code)]
@@ -289,7 +267,11 @@ pub struct InstanceMockUtils<T: Trait> {
     _dummy: PhantomData<T>, // 0-sized data meant only to bound generic parameters
 }
 
-impl<T: Trait> InstanceMockUtils<T> where T::BlockNumber: From<u64> + Into<u64> {
+impl<T: Trait> InstanceMockUtils<T>
+where
+    T::BlockNumber: From<u64> + Into<u64>,
+    T::AccountId: From<AccountId32> + Into<AccountId32> + Clone,
+{
     pub fn mock_origin(origin: OriginType<T::AccountId>) -> T::Origin {
         match origin {
             OriginType::Signed(account_id) => T::Origin::from(RawOrigin::Signed(account_id)),
@@ -308,6 +290,19 @@ impl<T: Trait> InstanceMockUtils<T> where T::BlockNumber: From<u64> + Into<u64> 
             frame_system::Module::<T>::set_block_number(tmp_index + 1.into());
         }
     }
+
+    pub fn accounts_compare_20_bytes(
+        account_id_a: &T::AccountId,
+        account_id_b: &T::AccountId,
+    ) -> bool {
+        let a: AccountId32 = account_id_a.clone().into();
+        let b: AccountId32 = account_id_b.clone().into();
+
+        let account_id_b_ref: [u8; 32] = *AsRef::<[u8; 32]>::as_ref(&a);
+        let account_id_a_ref: [u8; 32] = *AsRef::<[u8; 32]>::as_ref(&b);
+
+        account_id_a_ref[0..20] == account_id_b_ref[0..20]
+    }
 }
 
 /////////////////// Mocks of Module's actions //////////////////////////////////
@@ -316,15 +311,18 @@ pub struct InstanceMocks<T: Trait> {
     _dummy: PhantomData<T>, // 0-sized data meant only to bound generic parameters
 }
 
-impl<T: Trait> InstanceMocks<T> where T::BlockNumber: From<u64> + Into<u64> {
-    pub fn test_call(
-        origin: OriginType<T::AccountId>,
-    ) {
-
+impl<T: Trait> InstanceMocks<T>
+where
+    T::BlockNumber: From<u64> + Into<u64>,
+    T::AccountId: From<AccountId32> + Into<AccountId32>,
+{
+    pub fn test_call(origin: OriginType<T::AccountId>, second_account_id: T::AccountId) {
         assert_eq!(
             Module::<T>::test_call(
-                InstanceMockUtils::<T>::mock_origin(origin.clone())
-            ).is_ok(),
+                InstanceMockUtils::<T>::mock_origin(origin.clone()),
+                second_account_id,
+            )
+            .is_ok(),
             true,
         );
     }
