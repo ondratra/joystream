@@ -18,6 +18,9 @@ use sp_core::{H160, H256, U256};
 use sp_runtime::traits::{MaybeSerialize, Member, UniqueSaturatedInto};
 use sp_runtime::AccountId32;
 
+use sp_core::{Blake2Hasher}; // tmp
+use pallet_evm::{AddressMapping};
+
 mod mock;
 mod tests;
 
@@ -40,7 +43,7 @@ pub struct GenesisAccount {
 /////////////////// Trait, Storage, Errors, and Events /////////////////////////
 
 /// The main content directory evm trait.
-pub trait Trait: frame_system::Trait {
+pub trait Trait: frame_system::Trait + pallet_evm::Trait {
     /// The overarching event type.
     type Event: From<Event<Self>> + Into<<Self as frame_system::Trait>::Event>;
 
@@ -60,7 +63,7 @@ pub trait Trait: frame_system::Trait {
 
     type Currency: Currency<Self::AccountId>;
 
-    type Evm: pallet_evm::Trait;
+    //type Evm: pallet_evm::Trait;
 }
 
 //pub trait AccountAddressMapping<AccountId: From<AccountId32> + Into<AccountId32>, Address> {
@@ -136,8 +139,15 @@ decl_error! {
     }
 }
 
+/*
 impl<T: Trait> From<pallet_evm::Error<<T as Trait>::Evm>> for Error<T> {
     fn from(_error: pallet_evm::Error<<T as Trait>::Evm>) -> Self {
+        Error::<T>::EvmError
+    }
+}
+*/
+impl<T: Trait> From<pallet_evm::Error<T>> for Error<T> {
+    fn from(_error: pallet_evm::Error<T>) -> Self {
         Error::<T>::EvmError
     }
 }
@@ -178,11 +188,80 @@ decl_module! {
             */
             let account_id = ensure_signed(origin)?;
 
+            let second_address = T::AccountAddressMapping::into_address(&second_account_id);
+
+            let custom_address = H160::from([1u8; 20]);
+            let address_from = custom_address;
+
+            let tmp_derived_account2 = <T as pallet_evm::Trait>::AddressMapping::into_account_id(custom_address);
+            println!("{:?}", tmp_derived_account2);
+
+            // topup account
+            <T as Trait>::Currency::deposit_creating(
+                &account_id,
+                1000000000.into(),
+            );
+
+            <T as Trait>::Currency::deposit_creating(
+                //&tmp_derived_account,
+                //&T::AccountAddressMapping::account32_to_account(&tmp_derived_account),
+                //&T::AccountAddressMapping::account32_to_account(&tmp_derived_account2),
+                &tmp_derived_account2,
+                //&tmp_derived_account,
+                //&tmp_derived_account,
+                1000000000.into(),
+            );
+
+            let tmp33 = pallet_evm::Module::<T>::account_basic(&custom_address);
+            println!("{:?}", tmp33);
+
+            assert_eq!(<T as Trait>::Currency::free_balance(&account_id), 1000000000.into());
+
+            //
+            let result = pallet_evm::Module::<T>::execute_call(
+                //H160::zero(),
+                address_from,
+                //H160::zero(),
+                second_address,
+                vec![],
+                10000.into(),
+                400000,
+                1.into(),
+                //Some(1.into()),
+                Some(0.into()),
+                true,
+            );
+            println!("{:?}", result);
+            result?;
+
+            // emit event
+            Self::deposit_event(RawEvent::MyDummyEvent2());
+
+            Ok(())
+
+/*
             //let _tmp = <EnsureAddressSame as EnsureAddressOrigin<T::Origin>>::try_address_origin(H160::zero(), origin);
 
             //let address_from = T::AddressMapping::into_account_id(account_id.into());
             let address_from = T::AccountAddressMapping::into_address(&account_id);
+            println!("{:?}", address_from);
             let second_address = T::AccountAddressMapping::into_address(&second_account_id);
+
+            let tmp1 = pallet_evm::Module::<T::Evm>::account_basic(&address_from);
+            println!("{:?}", tmp1);
+
+            let custom_address = H160::from([1u8; 20]);
+
+
+
+            let tmp_derived_account = pallet_evm::HashedAddressMapping::<Blake2Hasher>::into_account_id(custom_address);
+            println!("{:?}", tmp_derived_account);
+
+
+            let tmp_derived_account2 = <<T as Trait>::Evm as pallet_evm::Trait>::AddressMapping::into_account_id(custom_address);
+            println!("{:?}", tmp_derived_account2);
+            //let tmp_address_from = custom_address;
+
 
             // topup account
             <T as Trait>::Currency::deposit_creating(
@@ -193,6 +272,24 @@ decl_module! {
                 &second_account_id,
                 1000000000.into(),
             );
+
+            <T as Trait>::Currency::deposit_creating(
+                //&tmp_derived_account,
+                //&T::AccountAddressMapping::account32_to_account(&tmp_derived_account),
+                //&T::AccountAddressMapping::account32_to_account(&tmp_derived_account2),
+                &tmp_derived_account2,
+                //&tmp_derived_account,
+                //&tmp_derived_account,
+                1000000000.into(),
+            );
+
+
+            let tmp11 = pallet_evm::Module::<T::Evm>::account_basic(&address_from);
+            println!("{:?}", tmp11);
+            let tmp22 = pallet_evm::Module::<T::Evm>::account_basic(&second_address);
+            println!("{:?}", tmp22);
+            let tmp33 = pallet_evm::Module::<T::Evm>::account_basic(&custom_address);
+            println!("{:?}", tmp33);
 
             //assert_eq!(<T as Trait>::Currency::total_balance(&account_id), 1000000000.into());
             assert_eq!(<T as Trait>::Currency::free_balance(&account_id), 1000000000.into());
@@ -218,6 +315,7 @@ decl_module! {
             Self::deposit_event(RawEvent::MyDummyEvent2());
 
             Ok(())
+*/
         }
     }
 }

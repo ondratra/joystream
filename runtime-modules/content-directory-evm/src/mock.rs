@@ -91,7 +91,7 @@ impl Trait for Runtime {
     //type AddressMapping = HashedAddressMapping<BlakeTwo256>;
     type AccountAddressMapping = AccountAddressConverter<Self::AccountId, H160, Blake2Hasher>;
 
-    type Evm = Self;
+    //type Evm = Self;
 }
 
 impl pallet_timestamp::Trait for Runtime {
@@ -125,6 +125,7 @@ impl<
     > AccountAddressMapping<AccountId, Address> for AccountAddressConverter<AccountId, Address, H>
 {
     fn into_account_id(address: &Address) -> AccountId {
+        
         let address_h160: H160 = address.clone().into();
         let address_bytes: [u8; 20] = address_h160.to_fixed_bytes();
 
@@ -135,6 +136,23 @@ impl<
         let tmp = AccountId32::from(address_bytes_32);
 
         Self::account32_to_account(&tmp)
+        
+
+        /*
+        let mut data = [0u8; 24];
+        data[0..4].copy_from_slice(b"evm:");
+        //data[4..24].copy_from_slice(&address[..]);
+        //data[4..24].copy_from_slice(&(From::<H160>::from((*address).into()))[..]);
+
+        let tmp: H160 = (address.clone()).into();
+        data[4..24].copy_from_slice(&tmp[..]);
+
+        let hash = H::hash(&data);
+
+        let tmp = AccountId32::from(Into::<[u8; 32]>::into(hash));
+
+        Self::account32_to_account(&tmp)
+        */
     }
 
     fn into_address(account_id: &AccountId) -> Address {
