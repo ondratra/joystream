@@ -10,7 +10,7 @@ use frame_support::traits::Currency;
 use frame_support::{
     decl_error, decl_event, decl_module, decl_storage, error::BadOrigin, Parameter,
 };
-use frame_system::ensure_signed;
+use frame_system::{ensure_signed, ensure_root};
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 use sp_arithmetic::traits::BaseArithmetic;
@@ -63,6 +63,7 @@ pub trait Trait: frame_system::Trait + pallet_evm::Trait {
 
     type Currency: Currency<Self::AccountId>;
 
+    // TODO: try to find a way include evm trait like this (right now usage of this pattern )
     //type Evm: pallet_evm::Trait;
 }
 
@@ -73,6 +74,11 @@ pub trait AccountAddressMapping<AccountId, Address> {
 
     fn into_address(account_id: &AccountId) -> Address;
 
+    // Normalize account id for usage with EVM.
+    // This is needed for example when multiple T::AccountId (32-bytes) are converted into the same EVM address (20-bytes).
+    fn normalize_account_id(account_id: &AccountId) -> AccountId;
+
+    // arbitrary T::AccountId <-> AccountId32 type conversions
     fn account_to_account32(account_id: &AccountId) -> AccountId32;
     fn account32_to_account(account_id: &AccountId32) -> AccountId;
 }
@@ -81,36 +87,6 @@ decl_storage! {
     trait Store for Module<T: Trait> as ContentDirectoryEvm {
         /// Dummy storage value
         pub MyStorageValue get(fn my_storage_value) config(): T::MembershipId;
-
-        AccountCodes get(fn account_codes): map hasher(blake2_128_concat) H160 => Vec<u8>;
-        AccountStorages get(fn account_storages):
-            double_map hasher(blake2_128_concat) H160, hasher(blake2_128_concat) H256 => H256;
-    }
-
-    add_extra_genesis {
-        config(accounts): std::collections::BTreeMap<H160, GenesisAccount>;
-        build(|config: &GenesisConfig::<T>| {
-            for (address, account) in &config.accounts {
-                let account_id = <T as Trait>::AccountAddressMapping::into_account_id(address);
-
-                // ASSUME: in one single EVM transaction, the nonce will not increase more than
-                // `u128::max_value()`.
-                for _ in 0..account.nonce.low_u128() {
-                    frame_system::Module::<T>::inc_account_nonce(&account_id);
-                }
-
-                <T as Trait>::Currency::deposit_creating(
-                    &account_id,
-                    account.balance.low_u128().unique_saturated_into(),
-                );
-
-                AccountCodes::insert(address, &account.code);
-
-                for (index, value) in &account.storage {
-                    AccountStorages::insert(address, index, value);
-                }
-            }
-        });
     }
 }
 
@@ -174,139 +150,29 @@ decl_module! {
             origin,
             second_account_id: T::AccountId,
         ) -> Result<(), Error<T>> {
-            /*
-            <Module::<T> as pallet_evm::Trait>::execute_call(
-                source: H160,
-                target: H160,
-                input: Vec<u8>,
-                value: U256,
-                gas_limit: u32,
-                gas_price: U256,
-                nonce: Option<U256>,
-                apply_state: bool
-            );
-            */
             let account_id = ensure_signed(origin)?;
+            let account_id = T::AccountAddressMapping::normalize_account_id(&account_id);
 
-            let second_address = T::AccountAddressMapping::into_address(&second_account_id);
-
-            let custom_address = H160::from([1u8; 20]);
-            let address_from = custom_address;
-
-            let tmp_derived_account2 = <T as pallet_evm::Trait>::AddressMapping::into_account_id(custom_address);
-            println!("{:?}", tmp_derived_account2);
-
-            // topup account
-            <T as Trait>::Currency::deposit_creating(
-                &account_id,
-                1000000000.into(),
-            );
-
-            <T as Trait>::Currency::deposit_creating(
-                //&tmp_derived_account,
-                //&T::AccountAddressMapping::account32_to_account(&tmp_derived_account),
-                //&T::AccountAddressMapping::account32_to_account(&tmp_derived_account2),
-                &tmp_derived_account2,
-                //&tmp_derived_account,
-                //&tmp_derived_account,
-                1000000000.into(),
-            );
-
-            let tmp33 = pallet_evm::Module::<T>::account_basic(&custom_address);
-            println!("{:?}", tmp33);
-
-            assert_eq!(<T as Trait>::Currency::free_balance(&account_id), 1000000000.into());
-
-            //
-            let result = pallet_evm::Module::<T>::execute_call(
-                //H160::zero(),
-                address_from,
-                //H160::zero(),
-                second_address,
-                vec![],
-                10000.into(),
-                400000,
-                1.into(),
-                //Some(1.into()),
-                Some(0.into()),
-                true,
-            );
-            println!("{:?}", result);
-            result?;
-
-            // emit event
-            Self::deposit_event(RawEvent::MyDummyEvent2());
-
-            Ok(())
-
-/*
-            //let _tmp = <EnsureAddressSame as EnsureAddressOrigin<T::Origin>>::try_address_origin(H160::zero(), origin);
-
-            //let address_from = T::AddressMapping::into_account_id(account_id.into());
             let address_from = T::AccountAddressMapping::into_address(&account_id);
-            println!("{:?}", address_from);
-            let second_address = T::AccountAddressMapping::into_address(&second_account_id);
-
-            let tmp1 = pallet_evm::Module::<T::Evm>::account_basic(&address_from);
-            println!("{:?}", tmp1);
-
-            let custom_address = H160::from([1u8; 20]);
-
-
-
-            let tmp_derived_account = pallet_evm::HashedAddressMapping::<Blake2Hasher>::into_account_id(custom_address);
-            println!("{:?}", tmp_derived_account);
-
-
-            let tmp_derived_account2 = <<T as Trait>::Evm as pallet_evm::Trait>::AddressMapping::into_account_id(custom_address);
-            println!("{:?}", tmp_derived_account2);
-            //let tmp_address_from = custom_address;
-
+            let address_to = T::AccountAddressMapping::into_address(&second_account_id);
 
             // topup account
             <T as Trait>::Currency::deposit_creating(
                 &account_id,
                 1000000000.into(),
             );
-            <T as Trait>::Currency::deposit_creating(
-                &second_account_id,
-                1000000000.into(),
-            );
 
-            <T as Trait>::Currency::deposit_creating(
-                //&tmp_derived_account,
-                //&T::AccountAddressMapping::account32_to_account(&tmp_derived_account),
-                //&T::AccountAddressMapping::account32_to_account(&tmp_derived_account2),
-                &tmp_derived_account2,
-                //&tmp_derived_account,
-                //&tmp_derived_account,
-                1000000000.into(),
-            );
-
-
-            let tmp11 = pallet_evm::Module::<T::Evm>::account_basic(&address_from);
-            println!("{:?}", tmp11);
-            let tmp22 = pallet_evm::Module::<T::Evm>::account_basic(&second_address);
-            println!("{:?}", tmp22);
-            let tmp33 = pallet_evm::Module::<T::Evm>::account_basic(&custom_address);
-            println!("{:?}", tmp33);
-
-            //assert_eq!(<T as Trait>::Currency::total_balance(&account_id), 1000000000.into());
             assert_eq!(<T as Trait>::Currency::free_balance(&account_id), 1000000000.into());
 
-            //
-            let result = pallet_evm::Module::<T::Evm>::execute_call(
-                //H160::zero(),
-                address_from,
-                //H160::zero(),
-                second_address,
-                vec![],
-                10000.into(),
-                400000,
-                1.into(),
-                //Some(1.into()),
-                Some(0.into()),
-                true,
+            let result = pallet_evm::Module::<T>::execute_call(
+                address_from, // from address
+                address_to, // to address
+                vec![], // data
+                10000.into(), // value
+                400000, // gas limit
+                1.into(), // gas price
+                Some(0.into()), // nonce
+                true, // apply state (difference between transaction and read-only call)
             );
             println!("{:?}", result);
             result?;
@@ -315,37 +181,42 @@ decl_module! {
             Self::deposit_event(RawEvent::MyDummyEvent2());
 
             Ok(())
-*/
+        }
+
+        #[weight = 10_000_000]
+        pub fn deploy_smart_contract(
+            origin,
+            account_from: T::AccountId,
+            bytecode: Vec<u8>,
+        ) -> Result<(), Error<T>> {
+            ensure_root(origin)?;
+
+            let account_from = T::AccountAddressMapping::normalize_account_id(&account_from);
+
+            // topup account
+            <T as Trait>::Currency::deposit_creating(
+                &account_from,
+                1000000000.into(),
+            );
+
+            let address_from = T::AccountAddressMapping::into_address(&account_from);
+
+            let tmp33 = pallet_evm::Module::<T>::account_basic(&address_from);
+            println!("{:?}", tmp33);
+
+            let result = pallet_evm::Module::<T>::execute_create(
+                address_from, // from address
+                bytecode, // data
+                10000.into(), // value
+                4000000, // gas limit
+                1.into(), // gas price
+                Some(0.into()), // nonce
+                true, // apply state (difference between transaction and read-only call)
+            );
+            println!("{:?}", result);
+            result?;
+
+            Ok(())
         }
     }
 }
-
-/*
-struct EvmWrapper<T: Trait> {
-    _dummy: PhantomData<T>, // 0-sized data meant only to bound generic parameters
-}
-
-impl<T: Trait> EvmWrapper<T> {
-    // Wrapper
-    fn call(
-        source: H160,
-        target: H160,
-        input: Vec<u8>,
-        value: U256,
-        gas_limit: u32,
-        gas_price: U256,
-        nonce: Option<U256>,
-        apply_state: bool
-    ) {
-
-        source
-        target
-        input
-        value
-        gas_limit
-        gas_price
-        nonce
-        apply_state
-    }
-}
-*/

@@ -125,7 +125,7 @@ impl<
     > AccountAddressMapping<AccountId, Address> for AccountAddressConverter<AccountId, Address, H>
 {
     fn into_account_id(address: &Address) -> AccountId {
-        
+
         let address_h160: H160 = address.clone().into();
         let address_bytes: [u8; 20] = address_h160.to_fixed_bytes();
 
@@ -136,7 +136,7 @@ impl<
         let tmp = AccountId32::from(address_bytes_32);
 
         Self::account32_to_account(&tmp)
-        
+
 
         /*
         let mut data = [0u8; 24];
@@ -166,6 +166,19 @@ impl<
         address_bytes_20[0..20].copy_from_slice(&account_bytes_32[0..20]);
 
         H160::from(address_bytes_20).into()
+    }
+
+    fn normalize_account_id(account_id: &AccountId) -> AccountId {
+        let account_id32 = Self::account_to_account32(&account_id);
+
+        let tmp = *AsRef::<[u8; 32]>::as_ref(&account_id32);
+
+        let mut normalize_account_id: [u8; 32] = [0u8; 32];
+        normalize_account_id[0..20].copy_from_slice(&tmp[0..20]);
+
+        let account_id32 = AccountId32::from(normalize_account_id);
+
+        Self::account32_to_account(&account_id32)
     }
 
     fn account_to_account32(account_id: &AccountId) -> AccountId32 {
@@ -261,7 +274,7 @@ pub enum OriginType<AccountId> {
 pub fn default_genesis_config() -> GenesisConfig<Runtime> {
     GenesisConfig::<Runtime> {
         my_storage_value: 0,
-        accounts: BTreeMap::new(),
+        //accounts: BTreeMap::new(),
     }
 }
 
@@ -339,6 +352,18 @@ where
             Module::<T>::test_call(
                 InstanceMockUtils::<T>::mock_origin(origin.clone()),
                 second_account_id,
+            )
+            .is_ok(),
+            true,
+        );
+    }
+
+    pub fn deploy_smart_contract(origin: OriginType<T::AccountId>, account_from: T::AccountId, bytecode: Vec<u8>) {
+        assert_eq!(
+            Module::<T>::deploy_smart_contract(
+                InstanceMockUtils::<T>::mock_origin(origin.clone()),
+                account_from,
+                bytecode
             )
             .is_ok(),
             true,

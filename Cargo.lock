@@ -3886,6 +3886,7 @@ version = "3.0.0"
 dependencies = [
  "frame-support",
  "frame-system",
+ "hex",
  "pallet-balances",
  "pallet-content-directory",
  "pallet-evm",
