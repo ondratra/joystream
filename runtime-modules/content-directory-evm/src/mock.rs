@@ -17,6 +17,7 @@ use sp_runtime::{
 };
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
+use hex::FromHex;
 
 mod event_mod {
     pub use crate::Event;
@@ -334,6 +335,27 @@ where
 
         account_id_a_ref[0..20] == account_id_b_ref[0..20]
     }
+
+    pub fn get_testing_contract() -> Vec<u8> {
+        // TODO: load bytecode from file or compile it from source
+
+        // implementation of OpenZeppelin's `Ownable` contract via simple `contract MyOwnable is Ownable {...}`
+        //let abi = [{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"}];
+        let bytecode_string: &str = "608060405234801561001057600080fd5b5060006100216100c460201b60201c565b9050806000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff1602179055508073ffffffffffffffffffffffffffffffffffffffff16600073ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a3506100cc565b600033905090565b6104e6806100db6000396000f3fe608060405234801561001057600080fd5b50600436106100415760003560e01c8063715018a6146100465780638da5cb5b14610050578063f2fde38b14610084575b600080fd5b61004e6100c8565b005b61005861024e565b604051808273ffffffffffffffffffffffffffffffffffffffff16815260200191505060405180910390f35b6100c66004803603602081101561009a57600080fd5b81019080803573ffffffffffffffffffffffffffffffffffffffff169060200190929190505050610277565b005b6100d0610482565b73ffffffffffffffffffffffffffffffffffffffff1660008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff1614610190576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260208152602001807f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e657281525060200191505060405180910390fd5b600073ffffffffffffffffffffffffffffffffffffffff1660008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a360008060006101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff160217905550565b60008060009054906101000a900473ffffffffffffffffffffffffffffffffffffffff16905090565b61027f610482565b73ffffffffffffffffffffffffffffffffffffffff1660008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff161461033f576040517f08c379a00000000000000000000000000000000000000000000000000000000081526004018080602001828103825260208152602001807f4f776e61626c653a2063616c6c6572206973206e6f7420746865206f776e657281525060200191505060405180910390fd5b600073ffffffffffffffffffffffffffffffffffffffff168173ffffffffffffffffffffffffffffffffffffffff1614156103c5576040517f08c379a000000000000000000000000000000000000000000000000000000000815260040180806020018281038252602681526020018061048b6026913960400191505060405180910390fd5b8073ffffffffffffffffffffffffffffffffffffffff1660008054906101000a900473ffffffffffffffffffffffffffffffffffffffff1673ffffffffffffffffffffffffffffffffffffffff167f8be0079c531659141344cd1fd0a4f28419497f9722a3daafe3b4186f6b6457e060405160405180910390a3806000806101000a81548173ffffffffffffffffffffffffffffffffffffffff021916908373ffffffffffffffffffffffffffffffffffffffff16021790555050565b60003390509056fe4f776e61626c653a206e6577206f776e657220697320746865207a65726f2061646472657373a26469706673582212204de67e0cfcac78f7e6543b424bdae8f52d0d6e4351ef2440347d5f16056fae5564736f6c634300060c0033";
+
+        let bytecode: Vec<u8> = Vec::from_hex(bytecode_string).expect("Invalid hex");
+
+        // (bytecode, abi)
+        bytecode
+    }
+
+    pub fn get_testing_contract_call() -> Vec<u8> {
+        // call of OpenZeppelin's `Ownable` contract's function `owner`
+        let bytecode_string: &str = "8da5cb5b";
+
+        let bytecode: Vec<u8> = Vec::from_hex(bytecode_string).expect("Invalid hex");
+        bytecode
+    }
 }
 
 /////////////////// Mocks of Module's actions //////////////////////////////////
@@ -363,6 +385,18 @@ where
             Module::<T>::deploy_smart_contract(
                 InstanceMockUtils::<T>::mock_origin(origin.clone()),
                 account_from,
+                bytecode
+            )
+            .is_ok(),
+            true,
+        );
+    }
+
+    pub fn call_smart_contract(origin: OriginType<T::AccountId>, account_to: T::AccountId, bytecode: Vec<u8>) {
+        assert_eq!(
+            Module::<T>::call_smart_contract(
+                InstanceMockUtils::<T>::mock_origin(origin.clone()),
+                account_to,
                 bytecode
             )
             .is_ok(),

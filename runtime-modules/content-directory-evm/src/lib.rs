@@ -112,6 +112,9 @@ decl_error! {
         EvmError,
 
         BadOrigin,
+
+        // error while calling EVM contract
+        EvmCallFail,
     }
 }
 
@@ -207,16 +210,77 @@ decl_module! {
             let result = pallet_evm::Module::<T>::execute_create(
                 address_from, // from address
                 bytecode, // data
-                10000.into(), // value
+                //10000.into(), // value
+                0.into(), // value
                 4000000, // gas limit
                 1.into(), // gas price
-                Some(0.into()), // nonce
+                Some(0.into()), // nonce - TODO: setup nonce
                 true, // apply state (difference between transaction and read-only call)
             );
             println!("{:?}", result);
             result?;
 
             Ok(())
+        }
+
+        #[weight = 10_000_000]
+        pub fn call_smart_contract(
+            origin,
+            account_to: T::AccountId,
+            bytecode: Vec<u8>,
+        // TODO: try to find a way how to return Result<Vec<u8>, ...)
+        //) -> Result<Vec<u8>, Error<T>> {
+        //) -> Result<EvmCallResponse, Error<T>> {
+        ) -> Result<(), Error<T>> {
+            println!(" -- {:?} {:?}", bytecode, account_to);
+
+            let account_id = ensure_signed(origin)?;
+            let account_from = T::AccountAddressMapping::normalize_account_id(&account_id);
+            let address_from = T::AccountAddressMapping::into_address(&account_from);
+
+            let account_to = T::AccountAddressMapping::normalize_account_id(&account_to);
+            let address_to = T::AccountAddressMapping::into_address(&account_to);
+
+            let result = pallet_evm::Module::<T>::execute_call(
+                address_from, // from address
+                address_to, // address to
+                bytecode, // data
+                //10000.into(), // value
+                0.into(), // value
+                4000000, // gas limit
+                1.into(), // gas price
+                Some(1.into()), // nonce - TODO: setup nonce
+                true, // apply state (difference between transaction and read-only call)
+            );
+
+            println!("resuuult {:?}", result);
+            //result?;
+
+            match result {
+                Ok((pallet_evm::ExitReason::Succeed(_), response, _, _)) => {
+                    // TODO: find a way how to return response and move this hardcoded assert into mocks
+                    // account 1
+                    let tmp = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]; 
+                    assert_eq!(response, tmp);
+
+                    Ok(())
+                },
+                Ok((_, _, _, _)) => {
+                    Err(Error::EvmCallFail)
+                },
+                Err(_) => {
+                    Err(Error::EvmCallFail)
+                }
+            }
+
+            //Ok(())
+
+            /*
+            let (tmp1, tmp2, tmp3, tmp4) = result;
+
+            //Ok(EvmCallResponse(tmp1, tmp2, tmp3, tmp4))
+            Ok(result)
+            */
         }
     }
 }
