@@ -4,6 +4,7 @@ use crate::{AccountAddressMapping, GenesisConfig, Module, Trait};
 use frame_support::traits::OnFinalize;
 use frame_support::{impl_outer_event, impl_outer_origin, parameter_types};
 use frame_system::{EnsureOneOf, EnsureRoot, EnsureSigned, RawOrigin};
+use hex::FromHex;
 use pallet_evm::{
     Account as EVMAccount, AddressMapping, EnsureAddressNever, EnsureAddressRoot,
     EnsureAddressTruncated, FeeCalculator, HashedAddressMapping,
@@ -17,7 +18,6 @@ use sp_runtime::{
 };
 use std::collections::BTreeMap;
 use std::marker::PhantomData;
-use hex::FromHex;
 
 mod event_mod {
     pub use crate::Event;
@@ -117,8 +117,6 @@ pub struct AccountAddressConverter<AccountId, Address, H: Hasher<Out = H256>> {
     _dummy: PhantomData<(AccountId, Address, H)>, // 0-sized data meant only to bound generic parameters
 }
 
-// TODO: ensure that all possible AccountIds are convertable or create some meaningful restrictions
-//       there will be a problem if AccountId is 64-bit unsigned int while Ethereum private keys are 32-bit unsinged ints
 impl<
         AccountId: From<AccountId32> + Into<AccountId32> + Clone,
         Address: From<H160> + Into<H160> + Clone,
@@ -126,42 +124,21 @@ impl<
     > AccountAddressMapping<AccountId, Address> for AccountAddressConverter<AccountId, Address, H>
 {
     fn into_account_id(address: &Address) -> AccountId {
-
         let address_h160: H160 = address.clone().into();
         let address_bytes: [u8; 20] = address_h160.to_fixed_bytes();
 
         let mut address_bytes_32: [u8; 32] = [0u8; 32];
         address_bytes_32[0..20].copy_from_slice(&address_bytes[..]);
 
-        //let tmp = AccountId32::from(Into::<[u8; 32]>::into(address_bytes.into()));
         let tmp = AccountId32::from(address_bytes_32);
 
         Self::account32_to_account(&tmp)
-
-
-        /*
-        let mut data = [0u8; 24];
-        data[0..4].copy_from_slice(b"evm:");
-        //data[4..24].copy_from_slice(&address[..]);
-        //data[4..24].copy_from_slice(&(From::<H160>::from((*address).into()))[..]);
-
-        let tmp: H160 = (address.clone()).into();
-        data[4..24].copy_from_slice(&tmp[..]);
-
-        let hash = H::hash(&data);
-
-        let tmp = AccountId32::from(Into::<[u8; 32]>::into(hash));
-
-        Self::account32_to_account(&tmp)
-        */
     }
 
     fn into_address(account_id: &AccountId) -> Address {
-        // TODO: forbid interaction of accounts identified with higher number than 20 bytes (?)
-
         let account_id32 = Self::account_to_account32(account_id);
 
-        let mut account_bytes_32: [u8; 32] = *AsRef::<[u8; 32]>::as_ref(&account_id32);
+        let account_bytes_32: [u8; 32] = *AsRef::<[u8; 32]>::as_ref(&account_id32);
 
         let mut address_bytes_20: [u8; 20] = [0u8; 20];
         address_bytes_20[0..20].copy_from_slice(&account_bytes_32[0..20]);
@@ -218,46 +195,17 @@ impl FeeCalculator for FixedGasPrice {
 parameter_types! {
     pub const ChainId: u64 = 1;
 }
-/*
+
 // This trait needs newer version of evm pallet (thus upgrade to whole branch is required)
 impl pallet_evm::Trait for Runtime {
     type FeeCalculator = FixedGasPrice;
     type CallOrigin = EnsureAddressRoot<Self::AccountId>;
     type WithdrawOrigin = EnsureAddressNever<Self::AccountId>;
-    type AddressMapping = HashedAddressMapping<BlakeTwo256>;
-    type Currency = pallet_balances::Module<Runtime>;
-
-    // TODO: make events work
-    type Event = TestEvent;
-    //type Event: From<Event<Self>> + Into<Self::Event>;
-    type Precompiles = ();
-    type ChainId = ChainId;
-    //fn config() -> &'static Config {  }
-}
-*/
-// This trait needs newer version of evm pallet (thus upgrade to whole branch is required)
-impl pallet_evm::Trait for Runtime {
-    type FeeCalculator = FixedGasPrice;
-
-    /*
-    type CallOrigin = EnsureAddressRoot<Self::AccountId>;
-    type WithdrawOrigin = EnsureAddressNever<Self::AccountId>;
-    */
-    type CallOrigin = EnsureAddressRoot<Self::AccountId>;
-    type WithdrawOrigin = EnsureAddressNever<Self::AccountId>;
-
-    //type AddressMapping = HashedAddressMapping<BlakeTwo256>;
-    //type AddressMapping = HashedAddressMapping<Blake2Hasher>;
-    //type AddressMapping = MyHashedAddressMapping<BlakeTwo256>;
     type AddressMapping = AccountAddressConverter<Self::AccountId, H160, Blake2Hasher>;
     type Currency = pallet_balances::Module<Runtime>;
-
-    // TODO: make events work
     type Event = TestEvent;
-    //type Event: From<Event<Self>> + Into<Self::Event>;
     type Precompiles = ();
     type ChainId = ChainId;
-    //fn config() -> &'static Config {  }
 }
 
 /////////////////// Data structures ////////////////////////////////////////////
@@ -369,9 +317,9 @@ where
     T::BlockNumber: From<u64> + Into<u64>,
     T::AccountId: From<AccountId32> + Into<AccountId32>,
 {
-    pub fn test_call(origin: OriginType<T::AccountId>, second_account_id: T::AccountId) {
+    pub fn transfer_value(origin: OriginType<T::AccountId>, second_account_id: T::AccountId) {
         assert_eq!(
-            Module::<T>::test_call(
+            Module::<T>::transfer_value(
                 InstanceMockUtils::<T>::mock_origin(origin.clone()),
                 second_account_id,
             )
@@ -380,7 +328,11 @@ where
         );
     }
 
-    pub fn deploy_smart_contract(origin: OriginType<T::AccountId>, account_from: T::AccountId, bytecode: Vec<u8>) {
+    pub fn deploy_smart_contract(
+        origin: OriginType<T::AccountId>,
+        account_from: T::AccountId,
+        bytecode: Vec<u8>,
+    ) {
         assert_eq!(
             Module::<T>::deploy_smart_contract(
                 InstanceMockUtils::<T>::mock_origin(origin.clone()),
@@ -392,7 +344,11 @@ where
         );
     }
 
-    pub fn call_smart_contract(origin: OriginType<T::AccountId>, account_to: T::AccountId, bytecode: Vec<u8>) {
+    pub fn call_smart_contract(
+        origin: OriginType<T::AccountId>,
+        account_to: T::AccountId,
+        bytecode: Vec<u8>,
+    ) {
         assert_eq!(
             Module::<T>::call_smart_contract(
                 InstanceMockUtils::<T>::mock_origin(origin.clone()),

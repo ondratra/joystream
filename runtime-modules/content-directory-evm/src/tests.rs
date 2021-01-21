@@ -2,9 +2,9 @@
 
 use crate::mock::*;
 use crate::{AccountAddressMapping, Trait};
-use sp_runtime::AccountId32;
 use hex::FromHex;
 use sp_core::H160;
+use sp_runtime::AccountId32;
 
 type Mocks = InstanceMocks<Runtime>;
 type MockUtils = InstanceMockUtils<Runtime>;
@@ -17,8 +17,7 @@ fn evm_first_test() {
     build_test_externalities(config).execute_with(|| {
         let origin = OriginType::Signed(AccountId32::from(REGULAR_ACCOUNT_1));
 
-        Mocks::test_call(origin, AccountId32::from(REGULAR_ACCOUNT_2));
-        // todo
+        Mocks::transfer_value(origin, AccountId32::from(REGULAR_ACCOUNT_2));
     });
 }
 
@@ -72,14 +71,19 @@ fn contract_call() {
         let bytecode_deploy = MockUtils::get_testing_contract();
         let bytecode_call = MockUtils::get_testing_contract_call();
 
-        Mocks::deploy_smart_contract(origin_deploy.clone(), AccountId32::from(REGULAR_ACCOUNT_1), bytecode_deploy);
+        Mocks::deploy_smart_contract(
+            origin_deploy.clone(),
+            AccountId32::from(REGULAR_ACCOUNT_1),
+            bytecode_deploy,
+        );
 
         // TODO: read this from extrinsic result
         let tmp_address = "1c81a61a407017c58397a47d2ab28191b9b8ec9b";
-        let tmp_address2 = Vec::from_hex(tmp_address).expect("Invalid hex");;
+        let tmp_address2 = Vec::from_hex(tmp_address).expect("Invalid hex");
         let deployed_address = H160::from_slice(tmp_address2.as_slice());
 
-        let deployed_account_id = <Runtime as Trait>::AccountAddressMapping::into_account_id(&deployed_address);
+        let deployed_account_id =
+            <Runtime as Trait>::AccountAddressMapping::into_account_id(&deployed_address);
 
         Mocks::call_smart_contract(origin_call.clone(), deployed_account_id, bytecode_call);
     });

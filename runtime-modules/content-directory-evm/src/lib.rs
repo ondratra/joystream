@@ -10,16 +10,13 @@ use frame_support::traits::Currency;
 use frame_support::{
     decl_error, decl_event, decl_module, decl_storage, error::BadOrigin, Parameter,
 };
-use frame_system::{ensure_signed, ensure_root};
+use frame_system::{ensure_root, ensure_signed};
 #[cfg(feature = "std")]
 use serde::{Deserialize, Serialize};
 use sp_arithmetic::traits::BaseArithmetic;
 use sp_core::{H160, H256, U256};
-use sp_runtime::traits::{MaybeSerialize, Member, UniqueSaturatedInto};
+use sp_runtime::traits::{MaybeSerialize, Member};
 use sp_runtime::AccountId32;
-
-use sp_core::{Blake2Hasher}; // tmp
-use pallet_evm::{AddressMapping};
 
 mod mock;
 mod tests;
@@ -63,18 +60,21 @@ pub trait Trait: frame_system::Trait + pallet_evm::Trait {
 
     type Currency: Currency<Self::AccountId>;
 
-    // TODO: try to find a way include evm trait like this (right now usage of this pattern )
+    // TODO: try to find a way include evm trait like this
+    // (right now usage of this pattern causes error caused by difference Self::AccountId and Self::Evm::Accountid)
     //type Evm: pallet_evm::Trait;
 }
 
-//pub trait AccountAddressMapping<AccountId: From<AccountId32> + Into<AccountId32>, Address> {
+/// Trait for mapping Substrate accounts to Eth addresses and vice versa.
 pub trait AccountAddressMapping<AccountId, Address> {
-    // TODO: this function might need a rework as it is not sure if accounts and addresses have 1:1 relation
+    /// Convert Eth address to Substrate account.
     fn into_account_id(address: &Address) -> AccountId;
 
+    /// Convert Substrate account to Eth address.
     fn into_address(account_id: &AccountId) -> Address;
 
     // Normalize account id for usage with EVM.
+    // Use it everytime before `account_id` recieved from within Substrate is used.
     // This is needed for example when multiple T::AccountId (32-bytes) are converted into the same EVM address (20-bytes).
     fn normalize_account_id(account_id: &AccountId) -> AccountId;
 
@@ -147,9 +147,9 @@ decl_module! {
         /// Setup events
         fn deposit_event() = default;
 
-        /// Testing extrinsic - test each evm feature piece by piece before creating more sophisticated tests
+        /// Test transfering value using EVM.
         #[weight = 10_000_000]
-        pub fn test_call(
+        pub fn transfer_value(
             origin,
             second_account_id: T::AccountId,
         ) -> Result<(), Error<T>> {
@@ -165,6 +165,7 @@ decl_module! {
                 1000000000.into(),
             );
 
+            // make sure currency was really deposited
             assert_eq!(<T as Trait>::Currency::free_balance(&account_id), 1000000000.into());
 
             let result = pallet_evm::Module::<T>::execute_call(
@@ -174,7 +175,8 @@ decl_module! {
                 10000.into(), // value
                 400000, // gas limit
                 1.into(), // gas price
-                Some(0.into()), // nonce
+                //Some(0.into()), // use custom nonce - nonce can be retrieved via `frame_system::Module::<T>::account_nonce(account_id).into()`
+                None, // automaticly calculated nonce
                 true, // apply state (difference between transaction and read-only call)
             );
             println!("{:?}", result);
@@ -214,7 +216,7 @@ decl_module! {
                 0.into(), // value
                 4000000, // gas limit
                 1.into(), // gas price
-                Some(0.into()), // nonce - TODO: setup nonce
+                None, // automaticly calculated nonce
                 true, // apply state (difference between transaction and read-only call)
             );
             println!("{:?}", result);
@@ -228,9 +230,8 @@ decl_module! {
             origin,
             account_to: T::AccountId,
             bytecode: Vec<u8>,
-        // TODO: try to find a way how to return Result<Vec<u8>, ...)
+        // TODO: try to find a way how to return result bytecode via Result<Vec<u8>, ...)
         //) -> Result<Vec<u8>, Error<T>> {
-        //) -> Result<EvmCallResponse, Error<T>> {
         ) -> Result<(), Error<T>> {
             println!(" -- {:?} {:?}", bytecode, account_to);
 
@@ -249,38 +250,29 @@ decl_module! {
                 0.into(), // value
                 4000000, // gas limit
                 1.into(), // gas price
-                Some(1.into()), // nonce - TODO: setup nonce
+                None, // automaticly calculated nonce
                 true, // apply state (difference between transaction and read-only call)
             );
 
             println!("resuuult {:?}", result);
-            //result?;
 
             match result {
                 Ok((pallet_evm::ExitReason::Succeed(_), response, _, _)) => {
                     // TODO: find a way how to return response and move this hardcoded assert into mocks
                     // account 1
-                    let tmp = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]; 
+                    let tmp = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1];
                     assert_eq!(response, tmp);
 
                     Ok(())
                 },
                 Ok((_, _, _, _)) => {
+                    // consider returning new error rather than "fail" when transaction is reverted
                     Err(Error::EvmCallFail)
                 },
                 Err(_) => {
                     Err(Error::EvmCallFail)
                 }
             }
-
-            //Ok(())
-
-            /*
-            let (tmp1, tmp2, tmp3, tmp4) = result;
-
-            //Ok(EvmCallResponse(tmp1, tmp2, tmp3, tmp4))
-            Ok(result)
-            */
         }
     }
 }
