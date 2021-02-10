@@ -12,6 +12,9 @@ type Block @entity {
   network: Network!
 }
 
+################### Metin's recent changes #####################################
+# TODO: revisit
+
 enum EntryMethod {
   PAID
   SCREENING
@@ -41,8 +44,9 @@ type Membership @entity {
   "Member's root account id"
   rootAccount: String!
 
-  "Timestamp when member was registered"
-  registeredAtTime: DateTime!
+  # TODO: DateTime is not valid type - how to define time here?
+  #"Timestamp when member was registered"
+  #registeredAtTime: DateTime!
 
   "How the member was registered"
   entry: EntryMethod!
@@ -53,6 +57,226 @@ type Membership @entity {
   "The type of subscription the member has purchased if any."
   subscription: BigInt
 }
+
+################### New entities for content directory #########################
+
+## TODO: add description to fields
+
+enum NewAsset {
+  UPLOAD
+  URLS # TODO: is this variant ok? Substrate enum has parameter for this variant
+}
+
+enum ChannelOwner {
+  MEMBER
+  CURATOR_GROUP
+  DAO
+}
+
+enum EpisodeParameters {
+  NEW_VIDEO # TODO: is this variant ok? Substrate enum has parameter for this variant
+  EXISTING_VIDEO
+}
+
+enum PersonActor {
+  MEMBER
+  CURATOR
+}
+
+enum PersonController {
+  MEMBER
+  CURATORS
+}
+
+#type ChannelCategory {
+#  # No runtime information is currently stored for a Category.
+#}
+
+type ChannelCategoryCreationParameters @entity {
+  "Metadata for the category"
+  meta: String!
+}
+
+type ChannelCategoryUpdateParameters @entity {
+  # It is the only field so its not an Option
+  "Metadata for the category"
+  newMeta: String!
+}
+
+type ChannelRecord @entity {
+  "The owner of a channel"
+  owner: ChannelOwner!
+
+  "The videos under this channel"
+  videos: [BigInt]!
+
+  "The playlists under this channel"
+  playlists: [BigInt]!
+
+  "The series under this channel"
+  series: [BigInt]!
+
+  "If curators have censored this channel or not"
+  isCensored: Boolean!
+
+  "Reward account where revenue is sent if set."
+  reward_account: BigInt
+}
+
+type ChannelOwnershipTransferRequestRecord @entity {
+  "Related channel ID"
+  channelId: BigInt!
+
+  "New channel owner"
+  newOwner: ChannelOwner!
+
+  "TODO: description"
+  payment: BigInt!
+
+  "New account for receiving rewards"
+  newRewardAccount: BigInt
+}
+
+type ChannelCreationParameters @entity {
+  "Assets referenced by metadata"
+  assets: [NewAsset]!
+
+  "Metadata about the channel."
+  meta: String!
+}
+
+type ChannelUpdateParameters @entity {
+  "Assets referenced by metadata"
+  assets: [NewAsset]
+
+  "If set, metadata update for the channel."
+  newMeta: String
+}
+
+#type VideoCategory @entity {
+#  # No runtime information is currently stored for a Category.
+#}
+
+type VideoCategoryCreationParameters @entity {
+  "Metadata about the video category."
+  meta: String!
+}
+
+type VideoCategoryUpdateParameters @entity {
+  # It is the only field so its not an Option
+  "Metadata update for the video category."
+  newMeta: String!
+}
+
+type VideoCreationParameters @entity {
+  "Assets referenced by metadata"
+  assets: [NewAsset]
+
+  "Metadata for the video."
+  meta: String
+}
+
+type VideoUpdateParameters @entity {
+  "Assets referenced by metadata"
+  assets: [NewAsset]
+
+  "If set, metadata update for the video."
+  newMeta: String
+}
+
+# There is already Video entity (reflecting content of `content-directory-schemas`(?))
+#
+#type Video @entity {
+#  "Related channel ID"
+#  in_channel: Channel!
+#
+#  "TODO: description"
+#  in_series: Series
+#
+#  "Whether the curators have censored the video or not."
+#  is_censored: Boolean!
+#
+#  "Whether the curators have chosen to feature the video or not."
+#  is_featured: Boolean!
+#}
+
+type PlaylistCreationParameters @entity {
+  "Metadata about the playlist."
+  meta: String!
+}
+
+type PlaylistUpdateParameters @entity {
+  # It is the only field so its not an Option
+  "Metadata update for the playlist."
+  newMeta: String,
+}
+
+type Playlist @entity {
+  "The channel the playlist belongs to."
+  in_channel: Channel!,
+}
+
+type SeasonParameters @entity {
+  "Season assets referenced by metadata"
+  assets: [NewAsset]
+
+  "Season episodes"
+  episodes: [EpisodeParameters]
+
+  "If set, Metadata update for season."
+  meta: [String]
+
+  seriesParameters: SeriesParameters @derivedFrom(field: "seasons")
+}
+
+type SeriesParameters @entity {
+  "Series assets referenced by metadata"
+  assets: [NewAsset]
+
+  "Series episodes"
+  seasons: [SeasonParameters]
+
+  "Metadata for series"
+  meta: [String],
+}
+
+type Season @entity {
+  "Season episodes"
+  episodes: [BigInt]!
+
+  series: Series @derivedFrom(field: "seasons")
+}
+
+type Series @entity {
+  "Related channel ID"
+  in_channel: BigInt!
+
+  "Related seasons"
+  seasons: [Season]!
+}
+
+type PersonCreationParameters @entity {
+  "Assets referenced by metadata"
+  assets: [NewAsset]!
+
+  "Metadata for person."
+  meta: String!
+}
+
+type PersonUpdateParameters @entity {
+  "Assets referenced by metadata"
+  assets: [NewAsset]
+
+  "Metadata to update person."
+  newMeta: String,
+}
+
+type Person @entity {
+  "Who can update or delete this person."
+  controlledBy: PersonController!
+}
+
+################################################################################
 
 """
 This type is to keep which entity belongs to which class. This type will be used

@@ -206,9 +206,13 @@ pub struct ChannelOwnershipTransferRequestRecord<
     Balance,
     AccountId,
 > {
+    /// Related channel ID
     channel_id: ChannelId,
+    /// New channel owner
     new_owner: ChannelOwner<MemberId, CuratorGroupId, DAOId>,
+    /// TODO: description
     payment: Balance,
+    /// New account for receiving rewards
     new_reward_account: Option<AccountId>,
 }
 
@@ -289,6 +293,7 @@ pub struct VideoUpdateParameters<ContentParameters> {
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
 pub struct Video<ChannelId, SeriesId> {
+    /// Related channel ID
     in_channel: ChannelId,
     // keep track of which season the video is in if it is an 'episode'
     // - prevent removing a video if it is in a season (because order is important)
@@ -368,6 +373,7 @@ pub struct SeriesParameters<VideoId, ContentParameters> {
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
 pub struct Season<VideoId> {
+    /// Season episodes
     episodes: Vec<VideoId>,
 }
 
@@ -375,7 +381,9 @@ pub struct Season<VideoId> {
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 #[derive(Encode, Decode, Default, Clone, PartialEq, Eq, Debug)]
 pub struct Series<ChannelId, VideoId> {
+    /// Related channel ID
     in_channel: ChannelId,
+    /// Related seasons
     seasons: Vec<Season<VideoId>>,
 }
 
