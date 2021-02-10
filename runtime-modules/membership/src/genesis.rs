@@ -6,12 +6,19 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Member<MemberId, AccountId, Moment> {
+    /// Member id
     pub member_id: MemberId,
+    /// Main member account
     pub root_account: AccountId,
+    /// Account controlling the membership
     pub controller_account: AccountId,
+    /// The unique handle chosen by member
     pub handle: String,
+    /// A Url to member's Avatar image
     pub avatar_uri: String,
+    /// Short text chosen by member to share information about themselves
     pub about: String,
+    /// Timestamp when member was registered
     pub registered_at_time: Moment,
 }
 

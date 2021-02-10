@@ -21,6 +21,38 @@ enum EntryMethod {
   GENESIS
 }
 
+type Member @entity {
+  "Member id"
+  memberId: BigInt,
+
+  "Main member account"
+  rootAccount: BigInt,
+
+  "Account controlling the membership"
+  controllerAccount: BigInt,
+
+  "The unique handle chosen by member"
+  handle: String @unique @fulltext(query: "membersByHandle")
+
+  "A Url to member's Avatar image"
+  avatarUri: String,
+
+  "Short text chosen by member to share information about themselves"
+  about: String,
+
+  # TODO: DateTime is not valid type - how to define time here?
+  #"Timestamp when member was registered"
+  #registered_at_time: DateTime,
+}
+
+type PaidMembershipTerms @entity {
+  "Quantity of native tokens which must be provably burned"
+  fee: BigInt!
+
+  "String of capped length describing human readable conditions which are being agreed upon"
+  text: String!
+}
+
 "Stored information about a registered user"
 type Membership @entity {
   "MemberId: runtime identifier for a user"
