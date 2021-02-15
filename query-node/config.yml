@@ -1,11 +1,11 @@
-metadata:
-  source: wss://babylon-sub-1.joystream.app/staging/rpc
-  blockHash: '0x206a6cca31333cb19ee120cde7455e13eea368ec3f6176d0cd48698228410489'
+#metadata:
+#  source: wss://babylon-sub-1.joystream.app/staging/rpc
+#  blockHash: '0x206a6cca31333cb19ee120cde7455e13eea368ec3f6176d0cd48698228410489'
 
 # use the following metadata instead when developing/debugging with local node
-#metadata:
-#  source: ws://localhost:9944
-#  blockHash: '0xd1ad168ff487544625b1f8c662725a6e5b9890f6a36cd30c42b3f170391f8ed0'
+metadata:
+  source: ws://localhost:9944
+  blockHash: '0xd1ad168ff487544625b1f8c662725a6e5b9890f6a36cd30c42b3f170391f8ed0'
 
 events:
   # members
