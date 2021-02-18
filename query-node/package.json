@@ -21,7 +21,9 @@
     "cd-classes": "ts-node scripts/get-class-id-and-name.ts",
     "integration-tests": "./run-tests.sh",
     "preview": "yarn hydra-cli preview",
-    "gen-types": "hydra-typegen/bin/run typegen config.yml"
+    "gen-types": "hydra-typegen/bin/run typegen config.yml",
+    "newcodegen": "yarn hydra-cli codegen --no-processor",
+    "newcodegen2": "yarn hydra-cli codegen"
   },
   "author": "",
   "license": "ISC",

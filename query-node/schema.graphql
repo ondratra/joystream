@@ -18,13 +18,13 @@ enum EntryMethod {
   GENESIS
 }
 
-type PaidMembershipTerms @entity {
-  "Quantity of native tokens which must be provably burned"
-  fee: BigInt!
-
-  "String of capped length describing human readable conditions which are being agreed upon"
-  text: String!
-}
+#type PaidMembershipTerms @entity {
+#  "Quantity of native tokens which must be provably burned"
+#  fee: BigInt!
+#
+#  "String of capped length describing human readable conditions which are being agreed upon"
+#  text: String!
+#}
 
 "Stored information about a registered user"
 type Membership @entity {

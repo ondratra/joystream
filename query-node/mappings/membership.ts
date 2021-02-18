@@ -3,7 +3,7 @@ import { Bytes } from '@polkadot/types'
 import { MemberId } from '@joystream/types/members'
 import { DatabaseManager, SubstrateEvent } from '@dzlzv/hydra-indexer-lib/lib'
 
-import { Members } from '../generated/types'
+//import { Members } from '../generated/types'
 import { EntryMethod, Membership } from '../generated/graphql-server/src/modules/membership/membership.model'
 import { Block, Network } from '../generated/graphql-server/src/modules/block/block.model'
 
@@ -17,6 +17,9 @@ function convertBytesToString(b: Bytes): string {
   return Buffer.from(b.toU8a(true)).toString()
 }
 
+export async function members_MemberRegistered(db: DatabaseManager, event_: SubstrateEvent): Promise<void> {
+}
+/*
 // eslint-disable-next-line @typescript-eslint/naming-convention
 export async function members_MemberRegistered(db: DatabaseManager, event_: SubstrateEvent): Promise<void> {
   const { accountId, memberId } = new Members.MemberRegisteredEvent(event_).data
@@ -43,7 +46,7 @@ export async function members_MemberRegistered(db: DatabaseManager, event_: Subs
     avatarUri: convertBytesToString(avatarUri.unwrap()),
     registeredAtBlock: block,
     // TODO: upgrade indexer-lib which support block timestamp: substrateEvent.timestamp
-    registeredAtTime: new Date(),
+    //registeredAtTime: new Date(),
     entry: EntryMethod.PAID, // TODO?: callArgs.paidTermsId
     suspended: false,
   })
@@ -95,3 +98,4 @@ export async function members_MemberSetControllerAccount(db: DatabaseManager, ev
   member.controllerAccount = newControllerAccount.toString()
   await db.save<Membership>(member)
 }
+*/

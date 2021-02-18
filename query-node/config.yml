@@ -5,7 +5,8 @@
 # use the following metadata instead when developing/debugging with local node
 metadata:
   source: ws://localhost:9944
-  blockHash: '0xd1ad168ff487544625b1f8c662725a6e5b9890f6a36cd30c42b3f170391f8ed0'
+  #blockHash: '0xd1ad168ff487544625b1f8c662725a6e5b9890f6a36cd30c42b3f170391f8ed0'
+  blockHash: '0x4d9a5131d9e2dc0bbb2053a0ec462e5a48eec3f1a45603b950b66a47b2db97e4'
 
 events:
   # members
@@ -25,8 +26,8 @@ events:
   - content.ChannelCreated
   - content.ChannelUpdated
   - content.ChannelDeleted
-  - content.ChannelCensored
-  - content.ChannelUncensored
+#  - content.ChannelCensored
+#  - content.ChannelUncensored
   - content.ChannelOwnershipTransferRequested
   - content.ChannelOwnershipTransferRequestWithdrawn
   - content.ChannelOwnershipTransferred
@@ -39,8 +40,8 @@ events:
   - content.VideoCreated
   - content.VideoUpdated
   - content.VideoDeleted
-  - content.VideoCensored
-  - content.VideoUncensored
+#  - content.VideoCensored
+#  - content.VideoUncensored
   - content.FeaturedVideosSet
   - content.PlaylistCreated
   - content.PlaylistUpdated
@@ -92,10 +93,10 @@ calls:
   - content.deletePerson
   - content.addPersonToVideo
   - content.removePersonFromVideo
-  - content.censorVideo
-  - content.censorChannel
-  - content.uncensorVideo
-  - content.uncensorChannel
+#  - content.censorVideo
+#  - content.censorChannel
+#  - content.uncensorVideo
+#  - content.uncensorChannel
   - content.createSeries
   - content.updateSeries
   - content.deleteSeries
