@@ -97,7 +97,9 @@ type AssetUploadStatus @variant {
   """
   dataObject: AssetDataObject!
 
-  
+  """
+  My test comment
+  """
   oldDataObject: AssetDataObject
 
   happenedIn: Block!
