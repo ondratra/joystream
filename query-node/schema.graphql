@@ -100,7 +100,7 @@ type AssetUploadStatus @variant {
   """
   Possible prior data object which was in some stage of upload life-cycle when new one was initiated.
   If accepted then apps may chose to use old in place of new before it is accepted.
-  If this is deleted, then set to null.
+  If this is deleted then set to null.
   """
   oldDataObject: AssetDataObject
 
